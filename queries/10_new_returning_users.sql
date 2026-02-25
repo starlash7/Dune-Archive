@@ -1,6 +1,6 @@
 -- Clober V2 New vs Returning Users (Base)
--- Daily tx count split by first-time vs returning traders
--- Visualization: Stacked bar chart (x: day, y: tx count, color: user_type)
+-- Daily unique user count: first-time vs returning traders
+-- Visualization: Stacked bar chart (x: day, y: users, color: user_type)
 
 WITH user_first_day AS (
     SELECT
@@ -12,8 +12,8 @@ WITH user_first_day AS (
     GROUP BY 1
 ),
 
-daily_txs AS (
-    SELECT
+daily_active AS (
+    SELECT DISTINCT
         block_date AS day,
         bytearray_substring(topic2, 13, 20) AS taker
     FROM base.logs
@@ -23,9 +23,9 @@ daily_txs AS (
 
 SELECT
     d.day,
-    COUNT(CASE WHEN d.day = u.first_day THEN 1 END) AS new_user_txs,
-    COUNT(CASE WHEN d.day > u.first_day THEN 1 END) AS returning_user_txs
-FROM daily_txs d
+    COUNT(DISTINCT CASE WHEN d.day = u.first_day THEN d.taker END) AS new_users,
+    COUNT(DISTINCT CASE WHEN d.day > u.first_day THEN d.taker END) AS returning_users
+FROM daily_active d
 JOIN user_first_day u ON d.taker = u.taker
 GROUP BY 1
 ORDER BY 1
