@@ -1,0 +1,16 @@
+-- 00. APAC Market Registry
+-- 목적: APAC 관련 마켓을 키워드로 분류하는 기반 쿼리
+-- 차트: Table
+--
+-- 출력 컬럼:
+--   ticker, title, category, apac_tag, impact_level, volume, status
+--
+-- 키워드 매핑:
+--   HIGH   → tariff, prc, china, korea, bts, kpop, k-pop
+--   MEDIUM → fed, interest rate, oil, wti, recession
+--   LOW    → bitcoin, ethereum, crypto, s&p, nasdaq, cpi, inflation
+--
+-- 테이블: kalshi.market_report
+-- 힌트: CASE WHEN + LOWER(title) LIKE '%keyword%' 패턴
+
+-- TODO: 여기에 쿼리 작성

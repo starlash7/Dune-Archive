@@ -1,0 +1,13 @@
+-- 01. Overview Counters
+-- 목적: 대시보드 상단 핵심 지표 카운터 3개
+-- 차트: Counter widgets (Dune에서 3개 별도 위젯 or 1개 쿼리 + 컬럼별 카운터)
+--
+-- 출력 컬럼:
+--   apac_trade_count    — APAC 시간대(UTC 00~08) 총 트레이드 수
+--   apac_contract_count — APAC 시간대 총 계약 수 (SUM(count))
+--   apac_active_markets — APAC 관련 활성(open) 마켓 수
+--
+-- 시간대 필터: HOUR(created_time) BETWEEN 0 AND 8 (UTC) = KST 09:00~17:00
+-- 테이블: kalshi.trade_report (트레이드/계약), kalshi.market_report (활성 마켓)
+
+-- TODO: 여기에 쿼리 작성
