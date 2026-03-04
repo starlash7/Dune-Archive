@@ -3,104 +3,118 @@
 -- 차트: Table
 --
 -- 출력 컬럼:
---   ticker, title, category, impact_level, impact_reason,
---   latest_yes_price, volume, open_interest, status
+--   report_ticker, ticker_name, impact_level, impact_reason,
+--   latest_yes_price, total_volume, trade_count, last_trade_date
 --
--- 테이블: kalshi.market_report + kalshi.trade_report
--- 힌트: title 키워드로 한국 영향도 분류, 최근 가격은 trade_report에서 JOIN
+-- 테이블: kalshi.trade_report
 
-WITH korea_markets AS (
+WITH classified AS (
     SELECT
-        ticker,
-        title,
-        category,
-        status,
-        volume,
-        open_interest,
+        report_ticker,
+        ticker_name,
+        price,
+        contracts_traded,
+        date,
+        created_time,
         CASE
-            WHEN LOWER(title) LIKE '%tariff%'
-              OR LOWER(title) LIKE '%china%'
-              OR LOWER(title) LIKE '%prc%'
-              OR LOWER(title) LIKE '%korea%'
-              OR LOWER(title) LIKE '%bts%'
-              OR LOWER(title) LIKE '%kpop%'
-              OR LOWER(title) LIKE '%k-pop%'
+            WHEN LOWER(ticker_name) LIKE '%tariff%'
+              OR LOWER(ticker_name) LIKE '%china%'
+              OR LOWER(ticker_name) LIKE '%prc%'
+              OR LOWER(ticker_name) LIKE '%korea%'
+              OR LOWER(ticker_name) LIKE '%bts%'
+              OR LOWER(ticker_name) LIKE '%kpop%'
+              OR LOWER(ticker_name) LIKE '%k-pop%'
                 THEN 'HIGH'
-            WHEN LOWER(title) LIKE '%fed%'
-              OR LOWER(title) LIKE '%interest rate%'
-              OR LOWER(title) LIKE '%oil%'
-              OR LOWER(title) LIKE '%wti%'
-              OR LOWER(title) LIKE '%recession%'
+            WHEN LOWER(ticker_name) LIKE '%fed%'
+              OR LOWER(ticker_name) LIKE '%interest rate%'
+              OR LOWER(ticker_name) LIKE '%oil%'
+              OR LOWER(ticker_name) LIKE '%wti%'
+              OR LOWER(ticker_name) LIKE '%recession%'
                 THEN 'MEDIUM'
-            WHEN LOWER(title) LIKE '%bitcoin%'
-              OR LOWER(title) LIKE '%ethereum%'
-              OR LOWER(title) LIKE '%crypto%'
-              OR LOWER(title) LIKE '%s&p%'
-              OR LOWER(title) LIKE '%nasdaq%'
-              OR LOWER(title) LIKE '%cpi%'
-              OR LOWER(title) LIKE '%inflation%'
+            WHEN LOWER(ticker_name) LIKE '%bitcoin%'
+              OR LOWER(ticker_name) LIKE '%ethereum%'
+              OR LOWER(ticker_name) LIKE '%crypto%'
+              OR LOWER(ticker_name) LIKE '%s&p%'
+              OR LOWER(ticker_name) LIKE '%nasdaq%'
+              OR LOWER(ticker_name) LIKE '%cpi%'
+              OR LOWER(ticker_name) LIKE '%inflation%'
                 THEN 'LOW'
         END AS impact_level,
         CASE
-            WHEN LOWER(title) LIKE '%tariff%'
-              OR LOWER(title) LIKE '%china%'
-              OR LOWER(title) LIKE '%prc%'
+            WHEN LOWER(ticker_name) LIKE '%tariff%'
+              OR LOWER(ticker_name) LIKE '%china%'
+              OR LOWER(ticker_name) LIKE '%prc%'
                 THEN '중국 관세 → 한국 수출/KOSPI'
-            WHEN LOWER(title) LIKE '%korea%'
-              OR LOWER(title) LIKE '%bts%'
-              OR LOWER(title) LIKE '%kpop%'
-              OR LOWER(title) LIKE '%k-pop%'
+            WHEN LOWER(ticker_name) LIKE '%korea%'
+              OR LOWER(ticker_name) LIKE '%bts%'
+              OR LOWER(ticker_name) LIKE '%kpop%'
+              OR LOWER(ticker_name) LIKE '%k-pop%'
                 THEN '한국 직접 관련'
-            WHEN LOWER(title) LIKE '%fed%'
-              OR LOWER(title) LIKE '%interest rate%'
+            WHEN LOWER(ticker_name) LIKE '%fed%'
+              OR LOWER(ticker_name) LIKE '%interest rate%'
                 THEN 'Fed 금리 → KRW 환율'
-            WHEN LOWER(title) LIKE '%oil%'
-              OR LOWER(title) LIKE '%wti%'
+            WHEN LOWER(ticker_name) LIKE '%oil%'
+              OR LOWER(ticker_name) LIKE '%wti%'
                 THEN '에너지 가격 → 수입국 한국'
-            WHEN LOWER(title) LIKE '%recession%'
+            WHEN LOWER(ticker_name) LIKE '%recession%'
                 THEN '미국 경기침체 → 글로벌 수요'
-            WHEN LOWER(title) LIKE '%bitcoin%'
-              OR LOWER(title) LIKE '%ethereum%'
-              OR LOWER(title) LIKE '%crypto%'
+            WHEN LOWER(ticker_name) LIKE '%bitcoin%'
+              OR LOWER(ticker_name) LIKE '%ethereum%'
+              OR LOWER(ticker_name) LIKE '%crypto%'
                 THEN '한국 크립토 거래량 세계 상위'
-            WHEN LOWER(title) LIKE '%s&p%'
-              OR LOWER(title) LIKE '%nasdaq%'
+            WHEN LOWER(ticker_name) LIKE '%s&p%'
+              OR LOWER(ticker_name) LIKE '%nasdaq%'
                 THEN '미국 증시 → KOSPI 동조화'
-            WHEN LOWER(title) LIKE '%cpi%'
-              OR LOWER(title) LIKE '%inflation%'
+            WHEN LOWER(ticker_name) LIKE '%cpi%'
+              OR LOWER(ticker_name) LIKE '%inflation%'
                 THEN '글로벌 인플레 → BOK 정책'
         END AS impact_reason
-    FROM kalshi.market_report
-    WHERE date = (SELECT MAX(date) FROM kalshi.market_report)
+    FROM kalshi.trade_report
+    WHERE price BETWEEN 1 AND 99
 ),
 
-latest_price AS (
+-- 마켓별 최신 가격 (가장 최근 거래)
+latest AS (
     SELECT
         report_ticker,
         price AS latest_yes_price,
         ROW_NUMBER() OVER (PARTITION BY report_ticker ORDER BY created_time DESC) AS rn
-    FROM kalshi.trade_report
+    FROM classified
+    WHERE impact_level IS NOT NULL
+),
+
+-- 마켓별 집계
+market_agg AS (
+    SELECT
+        report_ticker,
+        ticker_name,
+        impact_level,
+        impact_reason,
+        SUM(contracts_traded) AS total_volume,
+        COUNT(*) AS trade_count,
+        MAX(date) AS last_trade_date
+    FROM classified
+    WHERE impact_level IS NOT NULL
+    GROUP BY report_ticker, ticker_name, impact_level, impact_reason
 )
 
 SELECT
-    km.ticker,
-    km.title,
-    km.category,
-    km.impact_level,
-    km.impact_reason,
-    lp.latest_yes_price,
-    km.volume,
-    km.open_interest,
-    km.status
-FROM korea_markets km
-LEFT JOIN latest_price lp
-    ON km.ticker = lp.report_ticker
-    AND lp.rn = 1
-WHERE km.impact_level IS NOT NULL
+    ma.report_ticker,
+    ma.ticker_name,
+    ma.impact_level,
+    ma.impact_reason,
+    l.latest_yes_price,
+    ma.total_volume,
+    ma.trade_count,
+    ma.last_trade_date
+FROM market_agg ma
+LEFT JOIN latest l
+    ON ma.report_ticker = l.report_ticker
+    AND l.rn = 1
 ORDER BY
-    CASE km.impact_level
+    CASE ma.impact_level
         WHEN 'HIGH' THEN 1
         WHEN 'MEDIUM' THEN 2
         WHEN 'LOW' THEN 3
     END,
-    km.volume DESC
+    ma.total_volume DESC
