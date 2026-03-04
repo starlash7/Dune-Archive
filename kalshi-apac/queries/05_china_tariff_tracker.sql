@@ -1,17 +1,18 @@
 -- 05. China Tariff Tracker
--- 목적: 중국 관세율 관련 Top 마켓의 일별 odds(가격) 추이
--- 차트: Line Chart (x=date, y=avg_yes_price, color=market_label)
+-- 목적: 중국 관세 관련 Top 마켓의 일별 거래량 흐름 (Stacked Area)
+-- 차트: Area Chart (Stacked 100%)
 --
 -- 출력 컬럼:
---   date, market_label, avg_yes_price, daily_volume
+--   trade_week, market_label, weekly_volume
 --
 -- 테이블: kalshi.trade_report
 --
 -- Dune 차트 설정:
---   Visualization → Line Chart
---   X-axis: date
---   Y-axis: avg_yes_price
+--   Visualization → Area Chart
+--   X-axis: trade_week
+--   Y-axis: weekly_volume
 --   Group by: market_label
+--   Stacking: Percent (100%)
 --   Sort: X-axis ascending
 
 WITH china_tariff AS (
@@ -19,7 +20,6 @@ WITH china_tariff AS (
         report_ticker,
         ticker_name,
         date,
-        price,
         contracts_traded
     FROM kalshi.trade_report
     WHERE (
@@ -45,13 +45,11 @@ top_markets AS (
 )
 
 SELECT
-    ct.date,
-    -- 라벨을 짧게: ticker_name이 너무 길면 40자까지만
-    SUBSTR(tm.ticker_name, 1, 40) AS market_label,
-    AVG(ct.price) AS avg_yes_price,
-    SUM(ct.contracts_traded) AS daily_volume
+    DATE_TRUNC('week', ct.date) AS trade_week,
+    SUBSTR(tm.ticker_name, 1, 30) AS market_label,
+    SUM(ct.contracts_traded) AS weekly_volume
 FROM china_tariff ct
 INNER JOIN top_markets tm
     ON ct.report_ticker = tm.report_ticker
-GROUP BY ct.date, tm.ticker_name
-ORDER BY ct.date
+GROUP BY DATE_TRUNC('week', ct.date), tm.ticker_name
+ORDER BY trade_week
