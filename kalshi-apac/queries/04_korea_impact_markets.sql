@@ -114,26 +114,44 @@ latest AS (
         ROW_NUMBER() OVER (PARTITION BY report_ticker ORDER BY date DESC) AS rn
     FROM classified
     WHERE impact_level IS NOT NULL
+),
+
+-- impact_level별 상위 15개씩 추출
+ranked AS (
+    SELECT
+        ma.report_ticker,
+        ma.ticker_name,
+        ma.impact_level,
+        ma.impact_reason,
+        l.latest_yes_price,
+        ma.total_volume,
+        ma.trade_count,
+        ma.last_trade_date,
+        ROW_NUMBER() OVER (
+            PARTITION BY ma.impact_level
+            ORDER BY ma.total_volume DESC
+        ) AS level_rank
+    FROM market_agg ma
+    LEFT JOIN latest l
+        ON ma.report_ticker = l.report_ticker
+        AND l.rn = 1
 )
 
 SELECT
-    ma.report_ticker,
-    ma.ticker_name,
-    ma.impact_level,
-    ma.impact_reason,
-    l.latest_yes_price,
-    ma.total_volume,
-    ma.trade_count,
-    ma.last_trade_date
-FROM market_agg ma
-LEFT JOIN latest l
-    ON ma.report_ticker = l.report_ticker
-    AND l.rn = 1
+    report_ticker,
+    ticker_name,
+    impact_level,
+    impact_reason,
+    latest_yes_price,
+    total_volume,
+    trade_count,
+    last_trade_date
+FROM ranked
+WHERE level_rank <= 15
 ORDER BY
-    CASE ma.impact_level
+    CASE impact_level
         WHEN 'HIGH' THEN 1
         WHEN 'MEDIUM' THEN 2
         WHEN 'LOW' THEN 3
     END,
-    ma.total_volume DESC
-LIMIT 50
+    total_volume DESC
