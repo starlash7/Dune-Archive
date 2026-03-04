@@ -15,7 +15,6 @@ WITH classified AS (
         price,
         contracts_traded,
         date,
-        created_time,
         CASE
             WHEN LOWER(ticker_name) LIKE '%tariff%'
               OR LOWER(ticker_name) LIKE '%china%'
@@ -78,7 +77,7 @@ latest AS (
     SELECT
         report_ticker,
         price AS latest_yes_price,
-        ROW_NUMBER() OVER (PARTITION BY report_ticker ORDER BY created_time DESC) AS rn
+        ROW_NUMBER() OVER (PARTITION BY report_ticker ORDER BY date DESC) AS rn
     FROM classified
     WHERE impact_level IS NOT NULL
 ),
