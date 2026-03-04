@@ -1,34 +1,69 @@
--- 02. Hourly Trading Heatmap
--- 목적: 시간대별 트레이딩 볼륨 분포 — APAC 시간대(UTC 00~08) 하이라이트
--- 차트: Bar chart (X: hour, Y: contract_count, Color: session)
+-- 02. Daily Volume by APAC Category
+-- 목적: APAC 카테고리별 일별 거래량 분포
+-- 차트: Bar chart / Area chart
+--
+-- 원래 시간대별 히트맵이었으나 created_time 컬럼 미존재로
+-- 일별 + APAC 카테고리별 거래량 분석으로 변경
+--
+-- 하나의 쿼리로 다양한 차트 생성 가능:
+--   1) Bar Chart   → X: apac_category, Y: SUM(daily_volume) — 카테고리별 총 거래량
+--   2) Area Chart  → X: trade_date, Y: daily_volume, Color: apac_category — 일별 추이
+--   3) Table       → 전체 로우 — 상세 데이터
+--
+-- Dune 차트 설정 가이드:
+--   [Bar]  X=apac_category, Y=daily_volume (Sum), Sort: Y desc
+--   [Area] X=trade_date, Y=daily_volume, Group=apac_category, Stacking=Normal
+--   [Table] Sort: trade_date DESC
 --
 -- 출력 컬럼:
---   hour_utc       — 시간대 (0~23)
---   trade_count    — 트레이드 건수
---   contract_count — 총 계약 수 (SUM(count))
---   session        — 'APAC (KST 09-17)' / 'Global'
---   hour_label     — 표시용 라벨 (e.g. '00:00 UTC')
+--   trade_date, apac_category, daily_volume, trade_count, avg_price
 --
 -- 테이블: kalshi.trade_report
 
-WITH hourly AS (
+WITH categorized AS (
     SELECT
-        HOUR(created_time) AS hour_utc,
-        COUNT(*) AS trade_count,
-        SUM(count) AS contract_count
+        date AS trade_date,
+        contracts_traded,
+        price,
+        CASE
+            WHEN LOWER(ticker_name) LIKE '%tariff%'
+              OR LOWER(ticker_name) LIKE '%china%'
+              OR LOWER(ticker_name) LIKE '%prc%'
+                THEN 'China/Tariff'
+            WHEN LOWER(ticker_name) LIKE '%korea%'
+              OR LOWER(ticker_name) LIKE '%bts%'
+              OR LOWER(ticker_name) LIKE '%kpop%'
+              OR LOWER(ticker_name) LIKE '%k-pop%'
+                THEN 'Korea/K-Culture'
+            WHEN LOWER(ticker_name) LIKE '%bitcoin%'
+              OR LOWER(ticker_name) LIKE '%ethereum%'
+              OR LOWER(ticker_name) LIKE '%crypto%'
+                THEN 'Crypto'
+            WHEN LOWER(ticker_name) LIKE '%fed%'
+              OR LOWER(ticker_name) LIKE '%interest rate%'
+              OR LOWER(ticker_name) LIKE '%recession%'
+                THEN 'Fed/Macro'
+            WHEN LOWER(ticker_name) LIKE '%oil%'
+              OR LOWER(ticker_name) LIKE '%wti%'
+              OR LOWER(ticker_name) LIKE '%cpi%'
+              OR LOWER(ticker_name) LIKE '%inflation%'
+                THEN 'Energy/Inflation'
+            WHEN LOWER(ticker_name) LIKE '%s&p%'
+              OR LOWER(ticker_name) LIKE '%nasdaq%'
+              OR LOWER(ticker_name) LIKE '%gdp%'
+                THEN 'Equity/GDP'
+        END AS apac_category
     FROM kalshi.trade_report
-    GROUP BY 1
+    WHERE price BETWEEN 1 AND 99
 )
 
 SELECT
-    hour_utc,
-    trade_count,
-    contract_count,
-    CASE
-        WHEN hour_utc BETWEEN 0 AND 8
-        THEN 'APAC (KST 09-17)'
-        ELSE 'Global'
-    END AS session,
-    LPAD(CAST(hour_utc AS VARCHAR), 2, '0') || ':00 UTC' AS hour_label
-FROM hourly
-ORDER BY hour_utc
+    trade_date,
+    apac_category,
+    SUM(contracts_traded) AS daily_volume,
+    COUNT(*) AS trade_count,
+    ROUND(AVG(price), 1) AS avg_price
+FROM categorized
+WHERE apac_category IS NOT NULL
+GROUP BY trade_date, apac_category
+ORDER BY trade_date DESC, daily_volume DESC
