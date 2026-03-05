@@ -130,6 +130,7 @@ ranked AS (
 
 SELECT
     rank,
+    SUBSTR(ticker_name, 1, 30) AS short_name,
     ticker_name,
     report_ticker,
     apac_tag,
