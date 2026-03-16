@@ -1,0 +1,10 @@
+# Generated CSV data (upload to Dune manually)
+bittensor/data/csv/
+
+# Environment variables
+.env
+*.env
+
+# Python
+__pycache__/
+*.pyc
